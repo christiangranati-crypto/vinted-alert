@@ -63,10 +63,11 @@ def main():
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
-print("Status:", response.status_code)
-print("URL:", response.url)
-print("Pagina ricevuta:", len(response.text), "caratteri")
-print(response.text[:500])
+
+    print("Status:", response.status_code)
+    print("URL:", response.url)
+    print("Pagina ricevuta:", len(response.text), "caratteri")
+
     found = set()
 
     for link in soup.find_all("a", href=True):
