@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import requests
 from bs4 import BeautifulSoup
 
@@ -62,56 +63,54 @@ def main():
 
     response.raise_for_status()
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    page = response.text
 
     print("Status:", response.status_code)
     print("URL:", response.url)
-    print("Pagina ricevuta:", len(response.text), "caratteri")
-    print("items/ presenti:", response.text.count("/items/"))
-    print("item presenti:", response.text.lower().count("item"))
-    print("naruto presenti:", response.text.lower().count("naruto"))
+    print("Pagina ricevuta:", len(page), "caratteri")
 
-    found = set()
+    # Vinted può restituire gli URL dentro JSON con gli slash codificati.
+    normalized_page = page.replace("\\/", "/")
 
-    for link in soup.find_all("a", href=True):
-        href = link["href"]
+    print("items/ presenti:", normalized_page.count("/items/"))
+    print("item presenti:", normalized_page.lower().count("item"))
+    print("naruto presenti:", normalized_page.lower().count("naruto"))
 
-        if "/items/" not in href:
-            continue
+    found = {}
 
-        title = link.get_text(" ", strip=True)
+    # Cerca gli URL degli annunci direttamente nella pagina.
+    pattern = r'(?:https://www\.vinted\.it)?/items/(\d+)(?:-[^"\'<>\s\\]*)?'
 
-        if not title:
-            continue
+    matches = re.findall(pattern, normalized_page)
 
-        item_url = href
+    for item_id in matches:
+        item_url = f"https://www.vinted.it/items/{item_id}"
 
-        if item_url.startswith("/"):
-            item_url = "https://www.vinted.it" + item_url
+        if item_id not in found:
+            found[item_id] = item_url
 
-        item_id = item_url.split("/items/")[-1].split("-")[0]
-
-        found.add((item_id, title, item_url))
+    print(f"Annunci trovati: {len(found)}")
 
     new_items = []
 
-    for item_id, title, item_url in found:
+    for item_id, item_url in found.items():
         if item_id not in seen:
-            new_items.append((item_id, title, item_url))
+            new_items.append((item_id, item_url))
             seen.add(item_id)
 
-    for item_id, title, item_url in new_items:
+    for item_id, item_url in new_items:
         message = (
             "🚨 NUOVO ANNUNCIO VINTED\n\n"
-            f"{title}\n\n"
+            "Naruto Shippuden Ultimate Ninja Storm 3 True Despair\n\n"
             f"{item_url}"
         )
 
         send_telegram(message)
 
+        print("Nuovo annuncio:", item_url)
+
     save_seen(seen)
 
-    print(f"Annunci trovati: {len(found)}")
     print(f"Nuovi annunci: {len(new_items)}")
 
 
