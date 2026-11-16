@@ -67,6 +67,9 @@ def main():
     print("Status:", response.status_code)
     print("URL:", response.url)
     print("Pagina ricevuta:", len(response.text), "caratteri")
+    print("items/ presenti:", response.text.count("/items/"))
+    print("item presenti:", response.text.lower().count("item"))
+    print("naruto presenti:", response.text.lower().count("naruto"))
 
     found = set()
 
