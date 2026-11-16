@@ -2,7 +2,6 @@ import json
 import os
 import re
 import requests
-from bs4 import BeautifulSoup
 
 SEARCH_URL = "https://www.vinted.it/catalog?search_text=naruto%20shippuden%20ultimate%20ninja%20storm%203%20true%20despair"
 
@@ -14,13 +13,13 @@ TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
 def load_seen():
     if not os.path.exists(SEEN_FILE):
-        return set()
+        return None
 
     try:
         with open(SEEN_FILE, "r", encoding="utf-8") as f:
             return set(json.load(f))
     except (json.JSONDecodeError, OSError):
-        return set()
+        return None
 
 
 def save_seen(seen):
@@ -63,42 +62,33 @@ def main():
 
     response.raise_for_status()
 
-    page = response.text
+    page = response.text.replace("\\/", "/")
+
+    pattern = r'(?:https://www\.vinted\.it)?/items/(\d+)'
+
+    matches = re.findall(pattern, page)
+
+    found = set(matches)
 
     print("Status:", response.status_code)
-    print("URL:", response.url)
-    print("Pagina ricevuta:", len(page), "caratteri")
+    print("Annunci trovati:", len(found))
 
-    # Vinted può restituire gli URL dentro JSON con gli slash codificati.
-    normalized_page = page.replace("\\/", "/")
+    # Prima esecuzione: memorizza gli annunci già presenti
+    # senza inviare notifiche.
+    if seen is None:
+        save_seen(found)
 
-    print("items/ presenti:", normalized_page.count("/items/"))
-    print("item presenti:", normalized_page.lower().count("item"))
-    print("naruto presenti:", normalized_page.lower().count("naruto"))
+        print("Prima esecuzione.")
+        print("Annunci esistenti memorizzati:", len(found))
+        print("Nessuna notifica inviata.")
 
-    found = {}
+        return
 
-    # Cerca gli URL degli annunci direttamente nella pagina.
-    pattern = r'(?:https://www\.vinted\.it)?/items/(\d+)(?:-[^"\'<>\s\\]*)?'
+    new_items = found - seen
 
-    matches = re.findall(pattern, normalized_page)
-
-    for item_id in matches:
+    for item_id in new_items:
         item_url = f"https://www.vinted.it/items/{item_id}"
 
-        if item_id not in found:
-            found[item_id] = item_url
-
-    print(f"Annunci trovati: {len(found)}")
-
-    new_items = []
-
-    for item_id, item_url in found.items():
-        if item_id not in seen:
-            new_items.append((item_id, item_url))
-            seen.add(item_id)
-
-    for item_id, item_url in new_items:
         message = (
             "🚨 NUOVO ANNUNCIO VINTED\n\n"
             "Naruto Shippuden Ultimate Ninja Storm 3 True Despair\n\n"
@@ -109,9 +99,10 @@ def main():
 
         print("Nuovo annuncio:", item_url)
 
-    save_seen(seen)
+    updated_seen = seen | found
+    save_seen(updated_seen)
 
-    print(f"Nuovi annunci: {len(new_items)}")
+    print("Nuovi annunci:", len(new_items))
 
 
 if __name__ == "__main__":
